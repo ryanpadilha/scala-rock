@@ -38,6 +38,12 @@ abstract class MyList[+A] {
   def filter(predicate: A => Boolean): MyList[A]
 
   def ++[B >: A](list: MyList[B]): MyList[B]
+
+  // HOFs
+  def foreach(f: A => Unit): Unit
+  def sort(compare: (A, A) => Int): MyList[A]
+  def zipWith[B, C](list: MyList[B], zip:(A, B) => C): MyList[C]
+  def fold[B](start: B) (operator: (B, A) => B): B
 }
 
 case object Empty extends MyList[Nothing] {
@@ -54,6 +60,17 @@ case object Empty extends MyList[Nothing] {
   def filter(predicate: Nothing => Boolean): MyList[Nothing] = Empty
 
   def ++[B >: Nothing](list: MyList[B]): MyList[B] = list
+
+  // HOFs
+  def foreach(f: Nothing => Unit): Unit = ()
+
+  def sort(compare: (Nothing, Nothing) => Int): MyList[Nothing] = Empty
+
+  def zipWith[B, C](list: MyList[B], zip: (Nothing, B) => C): MyList[C] =
+    if (!list.isEmpty) throw new RuntimeException("list do not have the same lenght")
+    else Empty
+
+  def fold[B](start: B)(operator: (B, Nothing) => B): B = start
 }
 
 case class Cons[+A](h: A, t: MyList[A]) extends MyList[A] {
@@ -104,6 +121,39 @@ case class Cons[+A](h: A, t: MyList[A]) extends MyList[A] {
    */
   override def flatMap[B](transformer: A => MyList[B]): MyList[B] =
     transformer(h) ++ t.flatMap(transformer)
+
+  // HOFs
+  override def foreach(f: A => Unit): Unit = {
+    f(h)
+    t.foreach(f)
+  }
+
+  def sort(compare: (A, A) => Int): MyList[A] = {
+    def insert(x: A, sortedList: MyList[A]): MyList[A] =
+      if (sortedList.isEmpty) new Cons(x, Empty)
+      else if (compare(x, sortedList.head) <= 0) new Cons(x, sortedList)
+      else new Cons(sortedList.head, insert(x, sortedList.tail))
+
+    val sortedTail = t.sort(compare)
+    insert(h, sortedTail)
+  }
+
+  def zipWith[B, C](list: MyList[B], zip: (A, B) => C): MyList[C] = {
+    if (list.isEmpty) throw new RuntimeException("List do not have the same lenght")
+    else new Cons(zip(h, list.head), t.zipWith(list.tail, zip))
+  }
+
+  /*
+    [1,2,3].fold(0)(+) =
+    = [2,3].fold(1)(+) =
+    = [3].fold(3)(+) =
+    = [].fold(6)(+)
+    = 6
+   */
+  def fold[B](start: B)(operator: (B, A) => B): B = {
+    val newStart = operator(start, h)
+    t.fold(newStart)(operator)
+  }
 }
 
 // as a function language, theses traits does not make sense
@@ -131,11 +181,29 @@ object ListTest extends App {
   */
 
   val listOfInterger = new Cons(1, new Cons(2, new Cons(3, Empty)))
-  val anotherlistOfInterger = new Cons(4, new Cons(5, new Cons(6, Empty)))
+  val anotherlistOfInterger = new Cons(4, new Cons(5,Empty))
   val listOfStrings = new Cons("hello", new Cons("Scala", Empty))
 
   println(listOfInterger.toString)
   println(listOfStrings.toString)
+
+  // val listTransform = listOfInterger.map(element => element * 2)
+  val listTransform = listOfInterger.map(_ * 2)
+  println(listOfInterger.toString)
+
+  // val listPredicate = listOfInterger.filter(element => element % 2 == 0)
+  val listPredicate = listOfInterger.filter(_ % 2 == 0)
+
+  println(listPredicate.toString)
+  println(listOfInterger ++ anotherlistOfInterger)
+
+  val listFilterMap = listOfInterger.flatMap(element => new Cons(element, new Cons(element + 1, Empty)))
+
+  println(listFilterMap.toString)
+
+
+  /*
+    Way ONE
 
   val listTransform = listOfInterger.map(new Function1[Int, Int] {
     override def apply(element: Int): Int = element * 2
@@ -155,6 +223,25 @@ object ListTest extends App {
   })
 
   println(listFilterMap.toString)
+
+   */
+
+  // HOFs
+  // listOfInterger.foreach(x => println(x))
+  listOfInterger.foreach(println)
+  println(listOfInterger.sort((x, y) => y - x))
+  println(anotherlistOfInterger.zipWith[String, String](listOfStrings, _ + "-" + _))
+
+  println(listOfInterger.fold(0)(_ + _)) // reduce function
+
+  // for comprehensions
+  val combinations = for {
+    n <- listOfInterger
+    string <- listOfStrings
+  } yield n + "-" + string
+
+  println(combinations)
+
 
 
 }

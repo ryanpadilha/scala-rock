@@ -27,7 +27,9 @@ object AnonymousFunctions extends App {
     ** Exercises **
     1. MyList: replace all functionX calls with lambdas
     2. Rewrite the "special" adder as an anonymous function
-    
    */
+
+  val superAdder = (x: Int) => (y: Int) => x + y
+  println(superAdder(3)(4))
 
 }
